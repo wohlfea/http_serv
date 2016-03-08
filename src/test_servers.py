@@ -3,8 +3,8 @@ import pytest
 
 def test_client():
     from client import client
-    assert 1 == 1
-    # assert client("message 1") == "message 1"
+    # assert 1 == 1
+    assert client("message 1") == "message 1"
 
 # messages shorter than one buffer in length
 # messages longer than several buffers in length
