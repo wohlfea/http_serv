@@ -17,6 +17,7 @@ def server():
             buffer_length = 1024
             session_complete = False
             received_message = ''
+            # could send this back without chunking, accumulating it
             while not session_complete:
                 part = conn.recv(buffer_length)
                 received_message += part.decode('utf8')
