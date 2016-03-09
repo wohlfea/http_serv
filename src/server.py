@@ -16,20 +16,29 @@ def server():
         server.bind(ADDRESS)
         server.listen(1)
         while True:
-            conn = server.accept()
+            conn = server.accept()[0]
             session_complete = False
             received_message = ''
             while not session_complete:
                 part = conn.recv(BUFFER_LENGTH)
                 received_message += part.decode('utf8')
                 if len(part) < BUFFER_LENGTH:
-                    conn.sendall(received_message.encode('utf8'))
+                    print('Request Received:')
+                    print(received_message)
+                    conn.sendall(response_ok().encode('utf8'))
                     conn.close()
                     session_complete = True
     except KeyboardInterrupt:
         conn.close()
         server.close()
 
+
+def response_ok():
+    return """HTTP/1.1 200 OK\nContent-Type: text/plain\r\n"""
+
+
+def response_error():
+    return """HTTP/1.1 500 Internal Server Error\nContent-Type: text/plain\r\n"""
 
 if __name__ == "__main__":
     # run this as script
