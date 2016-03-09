@@ -1,5 +1,11 @@
+
+# -*- coding: UTF-8 -*-
 import socket
 """module docstring"""
+
+
+BUFFER_LENGTH = 1024
+ADDRESS = ('127.0.0.1', 5000)
 
 
 def server():
@@ -7,26 +13,19 @@ def server():
                            socket.SOCK_STREAM,
                            socket.IPPROTO_TCP)
     try:
-        address = ('127.0.0.1', 5000)
-        server.bind(address)
-        # start server running
+        server.bind(ADDRESS)
+        server.listen(1)
         while True:
-            server.listen(1)
-            conn, addr = server.accept()
-            # send responses to any received messages
-            buffer_length = 1024
+            conn = server.accept()
             session_complete = False
             received_message = ''
-            # could send this back without chunking, accumulating it
             while not session_complete:
-                part = conn.recv(buffer_length)
+                part = conn.recv(BUFFER_LENGTH)
                 received_message += part.decode('utf8')
-                if len(part) < buffer_length and received_message != '':
+                if len(part) < BUFFER_LENGTH:
                     conn.sendall(received_message.encode('utf8'))
-                    received_message = ''
                     conn.close()
                     session_complete = True
-    # DONE all sockets should be closed on exit
     except KeyboardInterrupt:
         conn.close()
         server.close()
