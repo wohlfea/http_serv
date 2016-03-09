@@ -16,7 +16,7 @@ def server():
         server.bind(ADDRESS)
         server.listen(1)
         while True:
-            conn = server.accept()
+            conn = server.accept()[0]
             session_complete = False
             received_message = ''
             while not session_complete:
