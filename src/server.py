@@ -1,11 +1,39 @@
 
 # -*- coding: UTF-8 -*-
 import socket
+import os
 """module docstring"""
 
 
 BUFFER_LENGTH = 1024
 ADDRESS = ('127.0.0.1', 5000)
+RESOURCES = 'resources/'
+EXTENSION_DICT = {
+    'html': 'text/html',
+    'txt': 'text/plain',
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'js': 'application/javascript',
+    'css': 'text/css',
+    'ico': 'image/x-icon',
+    'svg': 'image/svg+xml',
+}
+
+
+def resolve_uri(uri):
+    if url[-1] == u'/':
+        dir_listing = u'<h1>Directory Listing</h1><ul>'
+        for dirnames, subdirs, filenames in os.walk('.'):
+            for filename in filenames:
+                dir_listing += u'<li>{}/{}</li>'.format(dirnames, filename)
+        dir_listing += u'</ul>'
+        content_type = 'text/html'
+        body = dir_listing
+    else:
+        content_type = EXTENSION_DICT[uri.split('.')[-1]]
+        body = io.open(uri).read()
+
+    return content_type, body
 
 
 def server():
@@ -36,13 +64,16 @@ def server():
 def handled_request(request):
     try:
         uri = parse_request(request)
-        return response_ok() + uri
+        try:
+            return response_ok(*resolve_uri(uri))
+        except FileNotFoundError, IOError:
+            return response_error(u'404 Not Found')
     except SyntaxError:
-        return response_error('400 Bad Request')
+        return response_error(u'400 Bad Request')
     except ValueError:
-        return response_error('405 Method Not Allowed')
+        return response_error(u'405 Method Not Allowed')
     except NameError:
-        return response_error('505 HTTP Version Not Supported')
+        return response_error(u'505 HTTP Version Not Supported')
     else:
         return response_error()
 
@@ -69,8 +100,9 @@ def parse_request(http_request):
     return uri
 
 
-def response_ok():
-    return """HTTP/1.1 200 OK\nContent-Type: text/plain\r\n\r\n"""
+def response_ok(content_type, body):
+    """Given body, and content type return formatted http response"""
+    return 'HTTP/1.1 200 OK\nContent-Type: {}\r\n\r\n{}\r\n'.format(content_type, body)
 
 
 def response_error(error_type='500 Internal Server Error'):
