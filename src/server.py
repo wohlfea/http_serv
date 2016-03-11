@@ -34,17 +34,18 @@ def server():
             received_message = ''
             while not session_complete:
                 part = conn.recv(BUFFER_LENGTH)
-                received_message += part.decode('utf8')
+                received_message += part.decode('utf-8')
                 if len(part) < BUFFER_LENGTH:
                     print('Request Received:')
                     print(received_message)
-                    conn.sendall(handled_request(received_message).encode('utf8'))
+                    send_response(handled_request(received_message), conn)
                     conn.close()
                     session_complete = True
     except KeyboardInterrupt:
         conn.close()
     finally:
         server.close()
+
 
 def handled_request(request):
     try:
@@ -64,20 +65,21 @@ def handled_request(request):
 
 
 def resolve_uri(uri):
-    if uri[-1] == u'/':
-        #TODO: Test wether directory exists
-        #TODO: If request only consists of a / send index.html
+    if uri[-1] == u'/' and os.path.isdir(RESOURCES + uri):
+        # TODO: If request only consists of a / send index.html
         dir_listing = u'<h1>Directory Listing</h1><ul>'
-        for dirnames, subdirs, filenames in os.walk(RESOURCES):
+        for dirnames, subdirs, filenames in os.walk(RESOURCES + uri):
             for filename in filenames:
-                dir_listing += u'<li>{}/{}</li>'.format(dirnames, filename)
+                dir_listing += u'<li>{}/{}</li>'.format(dirnames[11:-1], filename)
         dir_listing += u'</ul>'
         content_type = 'text/html'
         body = dir_listing
+    elif uri[-1] == u'/' and not os.path.isdir(RESOURCES + uri):
+        raise IOError
+    # io.open throws IOError on bad filename
     else:
         content_type = EXTENSION_DICT[uri.split('.')[-1]]
-        print(RESOURCES+uri)
-        with io.open(RESOURCES+uri, 'r') as data:
+        with io.open(RESOURCES + uri, 'rb') as data:
             body = data.read()
     return content_type, body
 
@@ -88,7 +90,6 @@ def parse_request(http_request):
         # assert len(request_list) >= 2
         line_1 = request_list[0]
         method, uri, protocol = line_1.split()
-        print(method, uri, protocol)
         assert method == u'GET'
     except AssertionError:
         raise ValueError
@@ -107,13 +108,35 @@ def parse_request(http_request):
 
 def response_ok(content_type, body):
     """Given body, and content type return formatted http response"""
-    return 'HTTP/1.1 200 OK\nContent-Type: {}\r\n\r\n{}\r\n'.format(content_type, body)
+    initial_header = u'HTTP/1.1 200 OK '
+    content_type_header = u'Content-Type: {}\r\n'.format(content_type)
+    response = [initial_header, content_type_header, body]
+    return response
 
 
 def response_error(error_type='500 Internal Server Error'):
-    return u"HTTP/1.1 {}\r\n\r\n".format(error_type)
+    return [u"HTTP/1.1 {}".format(error_type)]
+
+
+def send_response(response_list, conn):
+    if not isinstance(response_list, list):
+        print(response_list)
+    for line in response_list:
+        print(line)
+        if isinstance(line, str):
+            conn.send(line.encode('utf-8'))
+        else:
+            conn.send(line)
 
 
 if __name__ == "__main__":
     # run this as script
     server()
+
+
+# open all files (resources) as bytes
+# catch all strings immediately before sending, and encode as bytes
+# don't bother concating header lines with each other or with body
+# send as series of lines (\r\n is implied when sending line by line)
+
+
