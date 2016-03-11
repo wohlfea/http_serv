@@ -2,38 +2,23 @@
 # -*- coding: UTF-8 -*-
 import socket
 import os
+import io
 """module docstring"""
 
 
 BUFFER_LENGTH = 1024
 ADDRESS = ('127.0.0.1', 5000)
-RESOURCES = 'resources/'
+RESOURCES = './resources'
 EXTENSION_DICT = {
     'html': 'text/html',
     'txt': 'text/plain',
-    'jpeg': 'image/jpeg',
+    'jpg': 'image/jpeg',
     'png': 'image/png',
     'js': 'application/javascript',
     'css': 'text/css',
     'ico': 'image/x-icon',
     'svg': 'image/svg+xml',
 }
-
-
-def resolve_uri(uri):
-    if url[-1] == u'/':
-        dir_listing = u'<h1>Directory Listing</h1><ul>'
-        for dirnames, subdirs, filenames in os.walk('.'):
-            for filename in filenames:
-                dir_listing += u'<li>{}/{}</li>'.format(dirnames, filename)
-        dir_listing += u'</ul>'
-        content_type = 'text/html'
-        body = dir_listing
-    else:
-        content_type = EXTENSION_DICT[uri.split('.')[-1]]
-        body = io.open(uri).read()
-
-    return content_type, body
 
 
 def server():
@@ -58,15 +43,15 @@ def server():
                     session_complete = True
     except KeyboardInterrupt:
         conn.close()
+    finally:
         server.close()
-
 
 def handled_request(request):
     try:
         uri = parse_request(request)
         try:
             return response_ok(*resolve_uri(uri))
-        except FileNotFoundError, IOError:
+        except (OSError, IOError):
             return response_error(u'404 Not Found')
     except SyntaxError:
         return response_error(u'400 Bad Request')
@@ -78,24 +63,44 @@ def handled_request(request):
         return response_error()
 
 
+def resolve_uri(uri):
+    if uri[-1] == u'/':
+        #TODO: Test wether directory exists
+        #TODO: If request only consists of a / send index.html
+        dir_listing = u'<h1>Directory Listing</h1><ul>'
+        for dirnames, subdirs, filenames in os.walk(RESOURCES):
+            for filename in filenames:
+                dir_listing += u'<li>{}/{}</li>'.format(dirnames, filename)
+        dir_listing += u'</ul>'
+        content_type = 'text/html'
+        body = dir_listing
+    else:
+        content_type = EXTENSION_DICT[uri.split('.')[-1]]
+        print(RESOURCES+uri)
+        with io.open(RESOURCES+uri, 'r') as data:
+            body = data.read()
+    return content_type, body
+
+
 def parse_request(http_request):
     try:
         request_list = http_request.split('\r\n')
         # assert len(request_list) >= 2
         line_1 = request_list[0]
         method, uri, protocol = line_1.split()
+        print(method, uri, protocol)
         assert method == u'GET'
-    except:
+    except AssertionError:
         raise ValueError
     try:
         assert protocol == u'HTTP/1.1'
-    except:
+    except AssertionError:
         raise NameError
     try:
         host_header = request_list[1]
         assert host_header[:5] == 'Host:'
         assert len(host_header.split()) == 2
-    except:
+    except AssertionError:
         raise SyntaxError
     return uri
 
