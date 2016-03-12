@@ -31,7 +31,7 @@ def server():
         while True:
             conn = server.accept()[0]
             session_complete = False
-            received_message = ''
+            received_message = u''
             while not session_complete:
                 part = conn.recv(BUFFER_LENGTH)
                 received_message += part.decode('utf-8')
@@ -39,10 +39,11 @@ def server():
                     print('Request Received:')
                     print(received_message)
                     send_response(handled_request(received_message), conn)
-                    conn.close()
                     session_complete = True
+                    conn.close()
     except KeyboardInterrupt:
-        conn.close()
+        if conn:
+            conn.close()
     finally:
         server.close()
 
@@ -108,8 +109,8 @@ def parse_request(http_request):
 
 def response_ok(content_type, body):
     """Given body, and content type return formatted http response"""
-    initial_header = u'HTTP/1.1 200 OK '
-    content_type_header = u'Content-Type: {}\r\n'.format(content_type)
+    initial_header = u'HTTP/1.1 200 OK\r\n'
+    content_type_header = u'Content-Type: {}\r\n\r\n'.format(content_type)
     response = [initial_header, content_type_header, body]
     return response
 
@@ -119,14 +120,11 @@ def response_error(error_type='500 Internal Server Error'):
 
 
 def send_response(response_list, conn):
-    if not isinstance(response_list, list):
-        print(response_list)
     for line in response_list:
-        print(line)
         if isinstance(line, str):
-            conn.send(line.encode('utf-8'))
-        else:
             conn.send(line)
+        else:
+            conn.send(line.encode('utf-8'))
 
 
 if __name__ == "__main__":
@@ -138,5 +136,3 @@ if __name__ == "__main__":
 # catch all strings immediately before sending, and encode as bytes
 # don't bother concating header lines with each other or with body
 # send as series of lines (\r\n is implied when sending line by line)
-
-
