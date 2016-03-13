@@ -21,6 +21,7 @@ EXTENSION_DICT = {
 
 
 def server():
+    """Create server to receive http requests and send http responses"""
     server = socket.socket(socket.AF_INET,
                            socket.SOCK_STREAM,
                            socket.IPPROTO_TCP)
@@ -30,17 +31,7 @@ def server():
         listening = True
         while listening:
             conn = server.accept()[0]
-            session_complete = False
-            received_message = u''
-            while not session_complete:
-                part = conn.recv(BUFFER_LENGTH)
-                received_message += part.decode('utf-8')
-                if len(part) < BUFFER_LENGTH:
-                    print('Request Received:')
-                    print(received_message)
-                    send_response(handled_request(received_message), conn)
-                    session_complete = True
-                    conn.close()
+            connection_handler(conn, ADDRESS)
     except KeyboardInterrupt:
         try:
             conn.close()
@@ -50,7 +41,23 @@ def server():
         server.close()
 
 
+def connection_handler(conn, ADDRESS):
+    """Receive message, respond, and close connection"""
+    session_complete = False
+    received_message = u''
+    while not session_complete:
+        part = conn.recv(BUFFER_LENGTH)
+        received_message += part.decode('utf-8')
+        if len(part) < BUFFER_LENGTH:
+            print('Request Received:')
+            print(received_message)
+            send_response(handled_request(received_message), conn)
+            session_complete = True
+            conn.close()
+
+
 def handled_request(request):
+    """Determine validity of request, returning http responses as appropriate"""
     try:
         uri = parse_request(request)
         try:
@@ -68,12 +75,14 @@ def handled_request(request):
 
 
 def resolve_uri(uri):
+    """Given uri, return local resource"""
     if uri[-1] == u'/' and os.path.isdir(RESOURCES + uri):
         # TODO: If request only consists of a / send index.html
         dir_listing = u'<h1>Directory Listing</h1><ul>'
         for dirnames, subdirs, filenames in os.walk(RESOURCES + uri):
             for filename in filenames:
-                dir_listing += u'<li>{}/{}</li>'.format(dirnames[11:-1], filename)
+                dir_listing += u'<li>{}/{}</li>'.format(dirnames[11:-1],
+                                                        filename)
         dir_listing += u'</ul>'
         content_type = 'text/html'
         body = dir_listing
@@ -88,6 +97,7 @@ def resolve_uri(uri):
 
 
 def parse_request(http_request):
+    """Parses http request, returning uri and raising errors on bad requests"""
     try:
         request_list = http_request.split('\r\n')
         # assert len(request_list) >= 2
@@ -110,7 +120,7 @@ def parse_request(http_request):
 
 
 def response_ok(content_type, body):
-    """Given body, and content type return formatted http response"""
+    """Return formatted http response"""
     initial_header = u'HTTP/1.1 200 OK'
     content_type_header = u'Content-Type: {}'.format(content_type)
     response = [initial_header, content_type_header, u'', body]
@@ -118,10 +128,12 @@ def response_ok(content_type, body):
 
 
 def response_error(error_type='500 Internal Server Error'):
+    """Return formatted http response error"""
     return [u"HTTP/1.1 {}".format(error_type), '']
 
 
 def send_response(response_list, conn):
+    """Send http response, one line at a time, encoding as necessary"""
     for line in response_list:
         if isinstance(line, str):
             conn.send(line.encode('utf-8'))
@@ -131,9 +143,3 @@ def send_response(response_list, conn):
 
 if __name__ == "__main__":
     server()
-
-
-# open all files (resources) as bytes
-# catch all strings immediately before sending, and encode as bytes
-# don't bother concating header lines with each other or with body
-# send as series of lines (\r\n is implied when sending line by line)

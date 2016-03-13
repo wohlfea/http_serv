@@ -6,4 +6,3 @@ On receiving a bad http request, server will return well-formatted http error co
 
 Server stays online, only excepting a keyboard interrupt. On keyboard interrupt, server diligently closes socket.
 
-Collaborated with 
