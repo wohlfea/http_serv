@@ -21,6 +21,7 @@ EXTENSION_DICT = {
 
 
 def server():
+    """Create server to receive http requests and send http responses"""
     server = socket.socket(socket.AF_INET,
                            socket.SOCK_STREAM,
                            socket.IPPROTO_TCP)
@@ -41,6 +42,7 @@ def server():
 
 
 def connection_handler(conn, ADDRESS):
+    """Receive message, respond, and close connection"""
     session_complete = False
     received_message = u''
     while not session_complete:
@@ -55,6 +57,7 @@ def connection_handler(conn, ADDRESS):
 
 
 def handled_request(request):
+    """Determine validity of request, returning http responses as appropriate"""
     try:
         uri = parse_request(request)
         try:
@@ -117,7 +120,7 @@ def parse_request(http_request):
 
 
 def response_ok(content_type, body):
-    """Given body, and content type return formatted http response"""
+    """Return formatted http response"""
     initial_header = u'HTTP/1.1 200 OK'
     content_type_header = u'Content-Type: {}'.format(content_type)
     response = [initial_header, content_type_header, u'', body]
@@ -125,11 +128,12 @@ def response_ok(content_type, body):
 
 
 def response_error(error_type='500 Internal Server Error'):
+    """Return formatted http response error"""
     return [u"HTTP/1.1 {}".format(error_type), '']
 
 
 def send_response(response_list, conn):
-    """Sends http response, one line at a time"""
+    """Send http response, one line at a time, encoding as necessary"""
     for line in response_list:
         if isinstance(line, str):
             conn.send(line.encode('utf-8'))
