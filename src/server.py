@@ -1,11 +1,23 @@
 
 # -*- coding: UTF-8 -*-
 import socket
-"""module docstring"""
+import os
+import io
 
 
 BUFFER_LENGTH = 1024
 ADDRESS = ('127.0.0.1', 5000)
+RESOURCES = './resources'
+EXTENSION_DICT = {
+    'html': 'text/html',
+    'txt': 'text/plain',
+    'jpg': 'image/jpeg',
+    'png': 'image/png',
+    'js': 'application/javascript',
+    'css': 'text/css',
+    'ico': 'image/x-icon',
+    'svg': 'image/svg+xml',
+}
 
 
 def server():
@@ -15,36 +27,64 @@ def server():
     try:
         server.bind(ADDRESS)
         server.listen(1)
-        while True:
+        listening = True
+        while listening:
             conn = server.accept()[0]
             session_complete = False
-            received_message = ''
+            received_message = u''
             while not session_complete:
                 part = conn.recv(BUFFER_LENGTH)
-                received_message += part.decode('utf8')
+                received_message += part.decode('utf-8')
                 if len(part) < BUFFER_LENGTH:
                     print('Request Received:')
                     print(received_message)
-                    conn.sendall(handled_request(received_message).encode('utf8'))
-                    conn.close()
+                    send_response(handled_request(received_message), conn)
                     session_complete = True
+                    conn.close()
     except KeyboardInterrupt:
-        conn.close()
+        try:
+            conn.close()
+        except UnboundLocalError:
+            pass
+    finally:
         server.close()
 
 
 def handled_request(request):
     try:
         uri = parse_request(request)
-        return response_ok() + uri
+        try:
+            return response_ok(*resolve_uri(uri))
+        except (OSError, IOError, KeyError):
+            return response_error(u'404 Not Found')
     except SyntaxError:
-        return response_error('400 Bad Request')
+        return response_error(u'400 Bad Request')
     except ValueError:
-        return response_error('405 Method Not Allowed')
+        return response_error(u'405 Method Not Allowed')
     except NameError:
-        return response_error('505 HTTP Version Not Supported')
+        return response_error(u'505 HTTP Version Not Supported')
     else:
         return response_error()
+
+
+def resolve_uri(uri):
+    if uri[-1] == u'/' and os.path.isdir(RESOURCES + uri):
+        # TODO: If request only consists of a / send index.html
+        dir_listing = u'<h1>Directory Listing</h1><ul>'
+        for dirnames, subdirs, filenames in os.walk(RESOURCES + uri):
+            for filename in filenames:
+                dir_listing += u'<li>{}/{}</li>'.format(dirnames[11:-1], filename)
+        dir_listing += u'</ul>'
+        content_type = 'text/html'
+        body = dir_listing
+    elif uri[-1] == u'/' and not os.path.isdir(RESOURCES + uri):
+        raise IOError
+    # io.open throws IOError on bad filename
+    else:
+        content_type = EXTENSION_DICT[uri.split('.')[-1]]
+        with io.open(RESOURCES + uri, 'rb') as data:
+            body = data.read()
+    return content_type, body
 
 
 def parse_request(http_request):
@@ -54,29 +94,46 @@ def parse_request(http_request):
         line_1 = request_list[0]
         method, uri, protocol = line_1.split()
         assert method == u'GET'
-    except:
+    except AssertionError:
         raise ValueError
     try:
         assert protocol == u'HTTP/1.1'
-    except:
+    except AssertionError:
         raise NameError
     try:
         host_header = request_list[1]
         assert host_header[:5] == 'Host:'
         assert len(host_header.split()) == 2
-    except:
+    except (AssertionError, IndexError):
         raise SyntaxError
     return uri
 
 
-def response_ok():
-    return """HTTP/1.1 200 OK\nContent-Type: text/plain\r\n\r\n"""
+def response_ok(content_type, body):
+    """Given body, and content type return formatted http response"""
+    initial_header = u'HTTP/1.1 200 OK'
+    content_type_header = u'Content-Type: {}'.format(content_type)
+    response = [initial_header, content_type_header, u'', body]
+    return response
 
 
 def response_error(error_type='500 Internal Server Error'):
-    return u"HTTP/1.1 {}\r\n\r\n".format(error_type)
+    return [u"HTTP/1.1 {}".format(error_type), '']
+
+
+def send_response(response_list, conn):
+    for line in response_list:
+        if isinstance(line, str):
+            conn.send(line.encode('utf-8'))
+        else:
+            conn.send(line)
 
 
 if __name__ == "__main__":
-    # run this as script
     server()
+
+
+# open all files (resources) as bytes
+# catch all strings immediately before sending, and encode as bytes
+# don't bother concating header lines with each other or with body
+# send as series of lines (\r\n is implied when sending line by line)
