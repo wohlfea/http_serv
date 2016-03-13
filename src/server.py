@@ -3,7 +3,6 @@
 import socket
 import os
 import io
-"""module docstring"""
 
 
 BUFFER_LENGTH = 1024
@@ -28,7 +27,8 @@ def server():
     try:
         server.bind(ADDRESS)
         server.listen(1)
-        while True:
+        listening = True
+        while listening:
             conn = server.accept()[0]
             session_complete = False
             received_message = u''
@@ -42,8 +42,10 @@ def server():
                     session_complete = True
                     conn.close()
     except KeyboardInterrupt:
-        if conn:
+        try:
             conn.close()
+        except UnboundLocalError:
+            pass
     finally:
         server.close()
 
@@ -53,7 +55,7 @@ def handled_request(request):
         uri = parse_request(request)
         try:
             return response_ok(*resolve_uri(uri))
-        except (OSError, IOError):
+        except (OSError, IOError, KeyError):
             return response_error(u'404 Not Found')
     except SyntaxError:
         return response_error(u'400 Bad Request')
@@ -102,33 +104,32 @@ def parse_request(http_request):
         host_header = request_list[1]
         assert host_header[:5] == 'Host:'
         assert len(host_header.split()) == 2
-    except AssertionError:
+    except (AssertionError, IndexError):
         raise SyntaxError
     return uri
 
 
 def response_ok(content_type, body):
     """Given body, and content type return formatted http response"""
-    initial_header = u'HTTP/1.1 200 OK\r\n'
-    content_type_header = u'Content-Type: {}\r\n\r\n'.format(content_type)
-    response = [initial_header, content_type_header, body]
+    initial_header = u'HTTP/1.1 200 OK'
+    content_type_header = u'Content-Type: {}'.format(content_type)
+    response = [initial_header, content_type_header, u'', body]
     return response
 
 
 def response_error(error_type='500 Internal Server Error'):
-    return [u"HTTP/1.1 {}".format(error_type)]
+    return [u"HTTP/1.1 {}".format(error_type), '']
 
 
 def send_response(response_list, conn):
     for line in response_list:
         if isinstance(line, str):
-            conn.send(line)
-        else:
             conn.send(line.encode('utf-8'))
+        else:
+            conn.send(line)
 
 
 if __name__ == "__main__":
-    # run this as script
     server()
 
 
