@@ -1,6 +1,7 @@
 from server import connection_handler
 
 if __name__ == '__main__':
+    """Wraps around connection_handler to handle multiple connections"""
     from gevent.server import StreamServer
     from gevent.monkey import patch_all
     patch_all()
